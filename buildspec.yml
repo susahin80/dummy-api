@@ -1,0 +1,27 @@
+version: 0.2
+env:
+    variables:
+        IMAGE: aws-dummy-api
+    parameter-store:
+        DOCKERHUB_TOKEN: /dockerhub/token
+        DOCKERHUB_USER: /dockerhub/user
+phases:
+    pre_build:
+        commands:
+            - "export IMAGE_TAG=$(cat package.json | grep version | head -1 | awk '{ print $2 }' | sed 's/[\",]//g ; s/,//g')"
+            - echo ${IMAGE_TAG}
+            - echo ${DOCKERHUB_TOKEN} | docker login -u ${DOCKERHUB_USER} --password-stdin
+            - FULL_IMAGE=${DOCKERHUB_USER}/${IMAGE}:${IMAGE_TAG}
+            - echo $FULL_IMAGE
+    build:
+        commands:
+            - docker build -t $FULL_IMAGE --target prod .
+            - docker push $FULL_IMAGE
+    post_build:
+        commands:
+            # Generate  image definitions file for ECS
+            - printf '[{"name":"dummy-api","imageUri":"%s" }]' ${FULL_IMAGE} > imagedefinitions.json    
+
+artifacts:
+    files:
+        - imagedefinitions.json
